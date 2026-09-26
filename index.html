@@ -25,6 +25,15 @@
         <label>AI 2<input id="name1" value="AI B"></label>
         <label>AI 3<input id="name2" value="AI C"></label>
       </div>
+      <label>お題プリセット
+        <select id="preset">
+          <option value="">手入力</option>
+        </select>
+      </label>
+      <div class="actions preset-actions">
+        <button id="randomPreset" type="button" class="secondary">ランダムお題</button>
+        <button id="swapWords" type="button" class="secondary">多数派 / 少数派を入れ替え</button>
+      </div>
       <div class="two">
         <label>多数派ワード<input id="majority" placeholder="例：海"></label>
         <label>少数派ワード<input id="minority" placeholder="例：湖"></label>
