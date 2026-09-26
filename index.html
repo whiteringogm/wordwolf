@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111318">
+  <title>AI Word Wolf Relay</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">AI WORD WOLF RELAY</p>
+        <h1>AIワードウルフ進行盤</h1>
+        <p class="lead">複数のAIチャットを、人間が最小限のコピペで中継するための進行ツール。</p>
+      </div>
+      <span class="local-badge">保存先：このブラウザ</span>
+    </header>
+
+    <section id="setup" class="card">
+      <h2>ゲーム設定</h2>
+      <div class="three">
+        <label>AI 1<input id="name0" value="AI A"></label>
+        <label>AI 2<input id="name1" value="AI B"></label>
+        <label>AI 3<input id="name2" value="AI C"></label>
+      </div>
+      <div class="two">
+        <label>多数派ワード<input id="majority" placeholder="例：海"></label>
+        <label>少数派ワード<input id="minority" placeholder="例：湖"></label>
+      </div>
+      <div class="two">
+        <label>少数派
+          <select id="minorityMode">
+            <option value="random">ランダム</option>
+            <option value="0">AI 1</option>
+            <option value="1">AI 2</option>
+            <option value="2">AI 3</option>
+          </select>
+        </label>
+        <label>GMメモ
+          <select id="gmMode">
+            <option value="on">使う</option>
+            <option value="off">使わない</option>
+          </select>
+        </label>
+      </div>
+      <p class="note">各AIの非公開メモは他のAIへ渡さない。次のプロンプトには共有発言だけを組み込む。</p>
+      <div class="actions">
+        <button id="start">開始</button>
+        <button id="resume" class="secondary">保存中のゲームを再開</button>
+      </div>
+    </section>
+
+    <section id="game" class="hidden">
+      <nav id="steps" class="steps" aria-label="進行"></nav>
+      <div class="layout">
+        <section class="card main-card">
+          <div class="turn-head">
+            <div>
+              <p id="phase" class="eyebrow"></p>
+              <h2 id="actor">—</h2>
+              <p id="instruction" class="muted"></p>
+            </div>
+            <span id="progress" class="counter"></span>
+          </div>
+
+          <label class="field-label">このAIへ送るプロンプト</label>
+          <textarea id="prompt" class="prompt" readonly></textarea>
+          <div class="actions">
+            <button id="copy">コピー</button>
+          </div>
+
+          <label class="field-label">AIの返答を貼る</label>
+          <textarea id="reply" class="reply" placeholder="返答をここへ貼る"></textarea>
+          <details id="preview">
+            <summary>共有発言とGMメモを確認・修正</summary>
+            <label class="field-label">共有発言</label>
+            <textarea id="share"></textarea>
+            <label class="field-label">GMメモ</label>
+            <textarea id="gm"></textarea>
+          </details>
+          <div class="actions">
+            <button id="saveNext">登録して次へ</button>
+            <button id="back" class="secondary">1手戻す</button>
+          </div>
+
+          <section id="finish" class="finish hidden"></section>
+        </section>
+
+        <aside class="card">
+          <div class="side-title">
+            <h2>共有ログ</h2>
+            <button id="export" class="ghost">JSON保存</button>
+          </div>
+          <div id="log" class="log"></div>
+          <button id="reset" class="danger">ゲームをリセット</button>
+        </aside>
+      </div>
+    </section>
+
+    <footer>
+      <p>外部API・Cookie不使用。入力内容はlocalStorageにのみ保存される。</p>
+      <p>ゲーム発想の参考：<a href="https://y-and.ai/3900/" target="_blank" rel="noopener noreferrer">you&amp;ai のAIワードウルフ記事</a>。本ツールの進行文・実装は独自作成。</p>
+    </footer>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
