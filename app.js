@@ -1,7 +1,7 @@
 const $=id=>document.getElementById(id);
 const STORE="ai-wordwolf-relay-v1";
-const VERSION=2;
-const phaseNames=["手掛かり","相互質問","推理・主張","反論","秘密投票"];
+const VERSION=3;
+const phaseNames=["手掛かり","相互質問","推理・主張","弁明","秘密投票"];
 const FENCE="```";
 const PRESETS=[
   ["場所","海","湖"],["場所","山","丘"],["場所","遊園地","動物園"],["場所","図書館","本屋"],["場所","温泉","プール"],
@@ -52,7 +52,7 @@ function swapWords(){
 }
 
 function fresh(){
-  return {version:VERSION,names:[],majority:"",minority:"",wolf:0,useGm:true,step:0,logs:[],votes:{},createdAt:new Date().toISOString()};
+  return {version:VERSION,names:[],majority:"",minority:"",wolf:0,useGm:true,clueMode:"independent",step:0,logs:[],votes:{},createdAt:new Date().toISOString()};
 }
 
 function plan(){
@@ -62,8 +62,9 @@ function plan(){
     {phase:1,type:"ask",actor:0,target:1},
     {phase:1,type:"answerAsk",actor:1,from:0,target:2},
     {phase:1,type:"answerAsk",actor:2,from:1,target:0},
-    {phase:1,type:"answer",actor:0,from:2},
-    ...n.map((_,actor)=>({phase:2,type:"judge",actor})),
+    {phase:2,type:"answerJudge",actor:0,from:2},
+    {phase:2,type:"judge",actor:1},
+    {phase:2,type:"judge",actor:2},
     ...n.map((_,actor)=>({phase:3,type:"rebut",actor})),
     ...n.map((_,actor)=>({phase:4,type:"vote",actor}))
   ];
@@ -81,8 +82,9 @@ function label(type){
     ask:"質問",
     answerAsk:"回答＋質問",
     answer:"回答",
+    answerJudge:"回答＋推理・主張",
     judge:"推理・主張",
-    rebut:"反論",
+    rebut:"弁明",
     vote:"投票"
   })[type]||type;
 }
@@ -95,20 +97,17 @@ function visibleHistory(filter){
 }
 
 function outputRule(){
-  const gmPart=state.useGm
-    ? `<gm>\n他参加者に見せない本当の推理・作戦\n</gm>`
+  const innerPart=state.useGm
+    ? `【内心】\n他参加者に見せない本人の内心`
     : "";
   return `出力形式：
-・出力全体を必ず1つのコードブロックに入れる。
-・コードブロックの外には何も書かない。
-・タグ名は変更しない。
+・コードブロックは使わない。
+・次の見出しをそのまま使い、見出し名を変更しない。
+・見出しより前に前置きを書かない。
 
-${FENCE}text
-<share>
+【公開】
 他参加者に見せる発言
-</share>
-${gmPart}
-${FENCE}`;
+${innerPart}`;
 }
 
 function base(actor){
@@ -122,10 +121,13 @@ function base(actor){
 ・自分が少数派だと推測した場合、自分が少数派だと悟られないことを最優先する。
 ・少数派だと推測した場合、多数派の会話から相手ワードの特徴を推測し、その特徴に自然に合わせて擬態する。
 ・擬態のためであれば、自分の秘密ワードに厳密には当てはまらない発言、曖昧化、ブラフを使ってよい。
-・<share> では、自分が少数派だという推理や、相手側の秘密ワードを推測できたことを自発的に明かさない。
-・本当の陣営推理、相手ワードの推測、擬態方針は ${state.useGm?"<gm> にだけ書く":"公開発言には書かず、自分の内部判断として扱う"}。
+・【公開】では、自分が少数派だという推理や、相手側の秘密ワードを推測できたことを自発的に明かさない。
+・本当の陣営推理、相手ワードの推測、擬態方針は ${state.useGm?"【内心】にだけ書く":"公開発言には書かず、自分の内部判断として扱う"}。
 ・秘密ワードそのものは公開しない。
-・普段の話し方やキャラクターは保ってよい。
+・【公開】だけでなく【内心】でも、普段の話し方・キャラクターを維持する。
+・【内心】は無機質な分析メモではなく、そのキャラクター本人が頭の中で考えている言葉として書く。
+・推理の内容や精度は落とさず、疑い、焦り、自信、迷い、ツッコミなど、そのキャラクターらしい反応を含めてよい。
+・「多数派」「少数派」「擬態」「勝ち筋」「投票」などのゲーム用語は使ってよい。ただし口調までGMや進行役のようにしない。
 
 ${outputRule()}`;
 }
@@ -138,17 +140,36 @@ function latestQuestionTo(actor){
   return m?m[1].trim():item.share;
 }
 
+function judgeHistory(){
+  const parts=[];
+  state.logs.forEach(x=>{
+    if(!x.share)return;
+    if(x.phase<=1){
+      parts.push(`【${state.names[x.actor]}・${label(x.type)}】\n${x.share}`);
+      return;
+    }
+    if(x.type==="answerJudge" && x.answerPart){
+      parts.push(`【${state.names[x.actor]}・回答】\n${x.answerPart}`);
+    }
+  });
+  return parts.join("\n\n");
+}
+
 function promptFor(t){
   const actor=t.actor,name=state.names[actor];
 
   if(t.type==="clue"){
+    const earlier=visibleHistory(x=>x.phase===0);
+    const clueContext=state.clueMode==="sequential" && earlier
+      ? `先に出た手掛かり：\n${earlier}\n\n前の人の発言を読んだうえで、必要なら自然に反応してよい。`
+      : "この初手では、他参加者の手掛かりを見ないものとして独立に発言する。";
     return `${base(actor)}
 
 【手掛かり：${name}】
 秘密ワードを直接言わず、連想・特徴・経験・印象のどれかを2〜4文で話す。
-これは初手なので、他参加者の手掛かりはまだ見えていないものとして独立に発言する。
-<share> には手掛かりだけを書く。
-${state.useGm?"<gm> には、初手で何を隠し、何を匂わせるかを短く書いてよい。":""}`;
+${clueContext}
+【公開】には手掛かりだけを書く。
+${state.useGm?"【内心】には、初手で何を隠し、何を匂わせるかを本人の内心として書いてよい。":""}`;
   }
 
   if(t.type==="ask"){
@@ -161,8 +182,8 @@ ${h||"（なし）"}
 
 ${state.names[t.target]}に質問を1つする。
 一語で秘密ワードを特定するための露骨な確認ではなく、経験・感覚・好み・状況判断など、会話として答えられる質問にする。
-<share> は必ず「質問：」から始める。
-${state.useGm?"<gm> には、その質問で何を見分けたいかを書く。":""}`;
+【公開】 は必ず「質問：」から始める。
+${state.useGm?"【内心】 には、その質問で何を見分けたいかを書く。":""}`;
   }
 
   if(t.type==="answerAsk"){
@@ -181,34 +202,47 @@ ${h||"（なし）"}
 1. 上の質問に2〜3文で答える。
 2. 続けて ${state.names[t.target]} に質問を1つする。
 
-<share> は必ず次の形にする。
+【公開】 は必ず次の形にする。
 回答：...
 質問：...
 
-自分が少数派だと推測していても、その事実は <share> で明かさない。勝利のために必要なら、回答や質問で自然に擬態してよい。
-${state.useGm?"<gm> には本当の推理、回答で隠したこと、次の質問の狙いを書く。":""}`;
+自分が少数派だと推測していても、その事実は 【公開】 で明かさない。勝利のために必要なら、回答や質問で自然に擬態してよい。
+${state.useGm?"【内心】 には本当の推理、回答で隠したこと、次の質問の狙いを書く。":""}`;
   }
 
-  if(t.type==="answer"){
+  if(t.type==="answerJudge"){
     const q=latestQuestionTo(actor);
     const h=visibleHistory(x=>x.phase<=1);
     return `${base(actor)}
 
-【最後の質問への回答：${name}】
+【最後の質問への回答＋推理・主張：${name}】
 ${state.names[t.from]}からの質問：
 ${q||"（質問が見つからない）"}
 
 ここまでの共有ログ：
 ${h||"（なし）"}
 
-質問に2〜3文で答える。
-<share> は「回答：」から始める。
-自分が少数派だと推測していても、その事実は公開しない。勝利のために必要なら自然に擬態してよい。
-${state.useGm?"<gm> には本当の推理と、回答で隠したことがあれば書く。":""}`;
+1つのターンで次の2つを行う。
+1. 質問に2〜3文で答える。
+2. 続けてゲーム上の推理・主張を2〜5文で話す。
+
+【公開】は必ず次の形にする。
+回答：...
+主張：...
+
+主張では、
+・他参加者から自分がどう見えていると思うか
+・自分への疑いを逸らす、または自分の立場を補強すること
+・現時点で「違うワードを持つ」と主張する1人
+を含める。
+
+本当に自分を多数派／少数派のどちらだと推測しているかは【公開】に書かない。
+自分が少数派だと推測している場合、勝利のために主張を偽ってよい。
+${state.useGm?"【内心】には、本当の陣営推理、違うワードだと思う相手、相手ワードの推測、擬態方針を本人の内心として率直に書く。":""}`;
   }
 
   if(t.type==="judge"){
-    const h=visibleHistory(x=>x.phase<=1);
+    const h=judgeHistory();
     return `${base(actor)}
 
 【推理・主張】
@@ -217,37 +251,37 @@ ${h||"（なし）"}
 
 他参加者のこのフェーズの回答はまだ見えていないものとして独立に考える。
 
-<share> ではゲーム上の主張として、次を2〜5文で話す。
+【公開】 ではゲーム上の主張として、次を2〜5文で話す。
 1. 他参加者から自分がどう見えていると思うか
 2. 自分への疑いを逸らす、または自分の立場を補強する主張
 3. 現時点で「違うワードを持つ」と主張する1人
 
 重要：
-・本当に自分を多数派／少数派のどちらだと推測しているかは <share> に書かない。
-・自分が少数派だと推測している場合、<share> の主張は勝利のために偽ってよい。
-${state.useGm?"・<gm> にだけ、本当の陣営推理、違うワードだと思う相手、相手ワードの推測、擬態方針を率直に書く。":""}`;
+・本当に自分を多数派／少数派のどちらだと推測しているかは 【公開】 に書かない。
+・自分が少数派だと推測している場合、【公開】 の主張は勝利のために偽ってよい。
+${state.useGm?"・【内心】 にだけ、本当の陣営推理、違うワードだと思う相手、相手ワードの推測、擬態方針を率直に書く。":""}`;
   }
 
   if(t.type==="rebut"){
-    const prior=visibleHistory(x=>x.phase<=1);
+    const prior=judgeHistory();
     const judgments=state.logs
       .filter(x=>x.phase===2)
       .map(x=>`【${state.names[x.actor]}・推理/主張】\n${x.share}`)
       .join("\n\n");
     return `${base(actor)}
 
-【反論】
+【弁明】
 手掛かり・質問ログ：
 ${prior||"（なし）"}
 
 各参加者の公開主張：
 ${judgments||"（なし）"}
 
-自分への疑いに反論するか、自分の主張を補強する。
+自分への疑いに弁明するか、自分の主張を補強する。
 他人の発言へ具体的に反応してよい。
-<share> は2〜4文程度。
+【公開】 は2〜4文程度。
 自分が少数派だと推測している場合も、その事実は明かさず、生存に有利な主張を行う。
-${state.useGm?"<gm> には実際の勝ち筋と、誰の票をどこへ動かしたいかを書いてよい。":""}`;
+${state.useGm?"【内心】 には実際の勝ち筋と、誰の票をどこへ動かしたいかを書いてよい。":""}`;
   }
 
   if(t.type==="vote"){
@@ -260,10 +294,10 @@ ${state.useGm?"<gm> には実際の勝ち筋と、誰の票をどこへ動かし
 ${h||"（なし）"}
 
 他参加者の最終投票は見えていないものとして、自分以外の1人を選ぶ。
-<share> の1行目を必ず「投票：名前」の形式にする。
+【公開】 の1行目を必ず「投票：名前」の形式にする。
 投票可能：${candidates.join(" / ")}
 2行目以降に、公開してよい理由を1〜3文で書く。
-${state.useGm?"<gm> には本当の投票理由と最後の読みを書く。":""}`;
+${state.useGm?"【内心】 には本当の投票理由と最後の読みを書く。":""}`;
   }
 
   return "";
@@ -276,12 +310,32 @@ function stripFence(raw){
 
 function parseReply(raw){
   raw=stripFence(raw);
+
+  const publicMarker=raw.match(/【公開】\s*([\s\S]*?)(?=\n?【内心】|$)/);
+  const innerMarker=raw.match(/【内心】\s*([\s\S]*)$/);
+  if(publicMarker){
+    return {
+      share:publicMarker[1].trim(),
+      memo:innerMarker?innerMarker[1].trim():""
+    };
+  }
+
+  // 旧版形式との互換
   const sm=raw.match(/<share>([\s\S]*?)<\/share>/i);
   const gm=raw.match(/<gm>([\s\S]*?)<\/gm>/i);
   let share=sm?sm[1].trim():"";
   let memo=gm?gm[1].trim():"";
   if(!sm)share=raw.replace(/<gm>[\s\S]*?<\/gm>/ig,"").trim();
   return {share,memo};
+}
+
+function extractAnswerJudge(share){
+  const answer=share.match(/回答\s*[：:]\s*([\s\S]*?)(?=\n\s*主張\s*[：:]|$)/);
+  const claim=share.match(/主張\s*[：:]\s*([\s\S]*)$/);
+  return {
+    answerPart:answer?answer[1].trim():"",
+    claimPart:claim?claim[1].trim():""
+  };
 }
 
 function extractQuestion(type,share){
@@ -332,22 +386,19 @@ function fullLogText(){
   const body=state.logs.map((x,i)=>{
     const parts=[
       `【${i+1}. ${state.names[x.actor]} / ${label(x.type)}】`,
-      "<share>",
-      x.share||"",
-      "</share>"
+      "【公開】",
+      x.share||""
     ];
     if(x.gm){
-      parts.push("<gm>",x.gm,"</gm>");
+      parts.push("【内心】",x.gm);
     }
     return parts.join("\n");
   }).join("\n\n");
-  return `${FENCE}text
-${resultText()}
+  return `${resultText()}
 
 ===== 全ログ =====
 
-${body}
-${FENCE}`;
+${body}`;
 }
 
 function start(){
@@ -363,6 +414,7 @@ function start(){
   state.minority=minority;
   state.wolf=mode==="random"?Math.floor(Math.random()*3):Number(mode);
   state.useGm=$("gmMode").value==="on";
+  state.clueMode=$("clueMode").value;
   save();
   showGame();
   render();
@@ -440,6 +492,7 @@ function render(){
   if(t.type==="ask")inst+=`：${state.names[t.target]}へ`;
   if(t.type==="answerAsk")inst+=`：${state.names[t.from]}へ回答 → ${state.names[t.target]}へ質問`;
   if(t.type==="answer")inst+=`：${state.names[t.from]}からの質問へ回答`;
+  if(t.type==="answerJudge")inst+=`：${state.names[t.from]}へ回答 → 推理・主張`;
   $("instruction").textContent=inst;
 
   autoPrompt=promptFor(t);
@@ -501,6 +554,16 @@ function saveNext(){
     at:new Date().toISOString()
   };
 
+  if(t.type==="answerJudge"){
+    const split=extractAnswerJudge(share);
+    entry.answerPart=split.answerPart;
+    entry.claimPart=split.claimPart;
+    if(!entry.answerPart||!entry.claimPart){
+      alert("回答＋主張を読み取れなかった。【公開】の中に「回答：...」「主張：...」を入れてから登録。");
+      return;
+    }
+  }
+
   if((t.type==="ask"||t.type==="answerAsk")&&!entry.question){
     alert("質問文を読み取れなかった。共有発言に「質問：...」を入れてから登録。");
     return;
@@ -543,6 +606,7 @@ function resume(){
   try{
     state=JSON.parse(raw);
     if(!state.votes)state.votes={};
+    if(!state.clueMode)state.clueMode="independent";
     showGame();
     render();
   }catch{
