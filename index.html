@@ -65,19 +65,24 @@
             <span id="progress" class="counter"></span>
           </div>
 
-          <label class="field-label">このAIへ送るプロンプト</label>
-          <textarea id="prompt" class="prompt" readonly></textarea>
+          <label class="field-label">このAIへ送る文面（編集可）</label>
+          <textarea id="prompt" class="prompt"></textarea>
           <div class="actions">
-            <button id="copy">コピー</button>
+            <button id="copy">文面をコピー</button>
+            <button id="restorePrompt" class="secondary">自動生成文に戻す</button>
           </div>
 
           <label class="field-label">AIの返答を貼る</label>
-          <textarea id="reply" class="reply" placeholder="返答をここへ貼る"></textarea>
+          <textarea id="reply" class="reply" placeholder="コードブロックごと、そのまま貼る"></textarea>
+          <div class="actions">
+            <button id="parse" class="secondary">返答を解析・編集</button>
+          </div>
+
           <details id="preview">
-            <summary>共有発言とGMメモを確認・修正</summary>
-            <label class="field-label">共有発言</label>
+            <summary>共有発言とGMメモ</summary>
+            <label class="field-label">共有発言（編集可）</label>
             <textarea id="share"></textarea>
-            <label class="field-label">GMメモ</label>
+            <label class="field-label">GMメモ（編集可）</label>
             <textarea id="gm"></textarea>
           </details>
           <div class="actions">
@@ -85,7 +90,19 @@
             <button id="back" class="secondary">1手戻す</button>
           </div>
 
-          <section id="finish" class="finish hidden"></section>
+          <section id="finish" class="finish hidden">
+            <div id="resultSummary"></div>
+            <label class="field-label">結果共有用</label>
+            <textarea id="resultText" class="share-output" readonly></textarea>
+            <div class="actions">
+              <button id="copyResult">結果をコピー</button>
+            </div>
+            <label class="field-label">全ログ共有用（GMメモ込み）</label>
+            <textarea id="fullLogText" class="share-output full-log" readonly></textarea>
+            <div class="actions">
+              <button id="copyFullLog">全ログをコピー</button>
+            </div>
+          </section>
         </section>
 
         <aside class="card">
