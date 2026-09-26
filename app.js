@@ -3,8 +3,53 @@ const STORE="ai-wordwolf-relay-v1";
 const VERSION=2;
 const phaseNames=["手掛かり","相互質問","推理・主張","反論","秘密投票"];
 const FENCE="```";
+const PRESETS=[
+  ["場所","海","湖"],["場所","山","丘"],["場所","遊園地","動物園"],["場所","図書館","本屋"],["場所","温泉","プール"],
+  ["食べ物","寿司","刺身"],["食べ物","カレー","シチュー"],["食べ物","うどん","そば"],["食べ物","プリン","ゼリー"],["食べ物","桃","りんご"],
+  ["飲み物","紅茶","コーヒー"],["飲み物","ビール","ウイスキー"],["飲み物","炭酸水","ジュース"],
+  ["生き物","犬","猫"],["生き物","イルカ","クジラ"],["生き物","蝶","蛾"],["生き物","カラス","ハト"],
+  ["物","傘","レインコート"],["物","鉛筆","シャープペン"],["物","時計","カレンダー"],["物","イヤホン","ヘッドホン"],
+  ["乗り物","電車","バス"],["乗り物","飛行機","新幹線"],["乗り物","自転車","バイク"],
+  ["行動","散歩","ジョギング"],["行動","昼寝","睡眠"],["行動","料理","お菓子作り"],["行動","写真","動画"],
+  ["概念","天才","努力家"],["概念","自由","安心"],["概念","偶然","運命"],["概念","本音","建前"]
+];
 let state=null;
 let autoPrompt="";
+
+function initPresets(){
+  const select=$("preset");
+  const groups={};
+  PRESETS.forEach(([category,a,b],i)=>{
+    if(!groups[category]){
+      groups[category]=document.createElement("optgroup");
+      groups[category].label=category;
+      select.appendChild(groups[category]);
+    }
+    const option=document.createElement("option");
+    option.value=String(i);
+    option.textContent=`${a} / ${b}`;
+    groups[category].appendChild(option);
+  });
+}
+
+function applyPreset(index){
+  const p=PRESETS[Number(index)];
+  if(!p)return;
+  $("majority").value=p[1];
+  $("minority").value=p[2];
+}
+
+function randomPreset(){
+  const index=Math.floor(Math.random()*PRESETS.length);
+  $("preset").value=String(index);
+  applyPreset(index);
+}
+
+function swapWords(){
+  const a=$("majority").value;
+  $("majority").value=$("minority").value;
+  $("minority").value=a;
+}
 
 function fresh(){
   return {version:VERSION,names:[],majority:"",minority:"",wolf:0,useGm:true,step:0,logs:[],votes:{},createdAt:new Date().toISOString()};
@@ -514,6 +559,12 @@ function exportJson(){
   setTimeout(()=>URL.revokeObjectURL(url),500);
 }
 
+initPresets();
+$("preset").addEventListener("change",e=>{
+  if(e.target.value!=="")applyPreset(e.target.value);
+});
+$("randomPreset").addEventListener("click",randomPreset);
+$("swapWords").addEventListener("click",swapWords);
 $("start").addEventListener("click",start);
 $("resume").addEventListener("click",resume);
 $("copy").addEventListener("click",()=>copyText($("prompt").value,$("copy")));
