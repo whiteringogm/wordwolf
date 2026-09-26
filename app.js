@@ -266,7 +266,10 @@ ${state.useGm?"・【内心】 にだけ、本当の陣営推理、違うワー�
     const prior=judgeHistory();
     const judgments=state.logs
       .filter(x=>x.phase===2)
-      .map(x=>`【${state.names[x.actor]}・推理/主張】\n${x.share}`)
+      .map(x=>{
+        const claim=x.type==="answerJudge" && x.claimPart ? `主張：${x.claimPart}` : x.share;
+        return `【${state.names[x.actor]}・推理/主張】\n${claim}`;
+      })
       .join("\n\n");
     return `${base(actor)}
 
@@ -440,7 +443,7 @@ function renderLog(){
         <span class="entry-kind">${esc(label(x.type))}</span>
       </div>
       <div class="entry-body">${esc(x.share).replace(/\n/g,"<br>")}</div>
-      ${x.gm?`<details><summary>GMメモ</summary><div class="gm-text">${esc(x.gm).replace(/\n/g,"<br>")}</div></details>`:""}
+      ${x.gm?`<details><summary>内心</summary><div class="gm-text">${esc(x.gm).replace(/\n/g,"<br>")}</div></details>`:""}
     </article>`).join("");
   box.scrollTop=box.scrollHeight;
 }
