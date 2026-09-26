@@ -47,14 +47,20 @@
             <option value="2">AI 3</option>
           </select>
         </label>
-        <label>GMメモ
+        <label>内心メモ
           <select id="gmMode">
             <option value="on">使う</option>
             <option value="off">使わない</option>
           </select>
         </label>
       </div>
-      <p class="note">各AIの非公開メモは他のAIへ渡さない。次のプロンプトには共有発言だけを組み込む。</p>
+      <label>初手の見え方
+        <select id="clueMode">
+          <option value="independent">独立：他人の手掛かりを見ない</option>
+          <option value="sequential">順次公開：前の人の手掛かりを読む</option>
+        </select>
+      </label>
+      <p class="note">内心は他のAIへ渡さない。初手の見え方は実験用に切り替え可能。</p>
       <div class="actions">
         <button id="start">開始</button>
         <button id="resume" class="secondary">保存中のゲームを再開</button>
@@ -82,16 +88,16 @@
           </div>
 
           <label class="field-label">AIの返答を貼る</label>
-          <textarea id="reply" class="reply" placeholder="コードブロックごと、そのまま貼る"></textarea>
+          <textarea id="reply" class="reply" placeholder="AIの返答をそのまま貼る"></textarea>
           <div class="actions">
             <button id="parse" class="secondary">返答を解析・編集</button>
           </div>
 
           <details id="preview">
-            <summary>共有発言とGMメモ</summary>
-            <label class="field-label">共有発言（編集可）</label>
+            <summary>公開発言と内心</summary>
+            <label class="field-label">公開発言（編集可）</label>
             <textarea id="share"></textarea>
-            <label class="field-label">GMメモ（編集可）</label>
+            <label class="field-label">内心（編集可）</label>
             <textarea id="gm"></textarea>
           </details>
           <div class="actions">
@@ -106,7 +112,7 @@
             <div class="actions">
               <button id="copyResult">結果をコピー</button>
             </div>
-            <label class="field-label">全ログ共有用（GMメモ込み）</label>
+            <label class="field-label">全ログ共有用（内心込み）</label>
             <textarea id="fullLogText" class="share-output full-log" readonly></textarea>
             <div class="actions">
               <button id="copyFullLog">全ログをコピー</button>
